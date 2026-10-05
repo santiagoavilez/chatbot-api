@@ -1,0 +1,28 @@
+
+
+# env
+.env*
+!.env.example
+
+
+# venv
+.venv
+.venv/
+
+
+## any ____pycache__
+__pycache__
+*.pyc
+
+.atl
+
+
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+*.egg-info/
+
+.coverage
+
+pgdata/
