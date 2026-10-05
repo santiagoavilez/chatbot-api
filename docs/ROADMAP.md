@@ -2,13 +2,13 @@
 
 Step-by-step build plan for a simple ChatGPT/Claude-style chat API. Work through the phases in order: each one depends on the previous one. Tick the boxes as you go and update **Current phase**.
 
-**Current phase: 1 (verify the database)**
+**Current phase: 3 Repository layer**
 
 | Phase | Goal                                                    | Status |
 | -------| ---------------------------------------------------------| --------|
 | 0     | Foundation (scaffolding, Docker, config, docs)          | Done   |
-| 1     | Verify the database starts and connects                 | Next   |
-| 2     | Models (SQLAlchemy + Alembic) and schemas (Pydantic v2) | Todo   |
+| 1     | Verify the database starts and connects                 | Done   |
+| 2     | Models (SQLAlchemy + Alembic) and schemas (Pydantic v2) | Next   |
 | 3     | Repository layer                                        | Todo   |
 | 4     | OpenRouter client                                       | Todo   |
 | 5     | Conversations CRUD                                      | Todo   |
@@ -45,10 +45,10 @@ Prove the stack works end to end before modeling anything.
 - [x] Align the DB password between `POSTGRES_PASSWORD` and `DATABASE_URL` in `.env`
 - [x] Align the `DATABASE_URL` driver: use `postgresql+asyncpg://` (required by async SQLAlchemy); update the default in `config.py` too
 - [x] `docker compose down -v && docker compose up --build`, then confirm `/health` and `/docs`
-- [ ] Create `app/db/session.py` with an async engine and a session factory
-- [ ] Run a trivial `SELECT 1` through the async session (loose script or temporary endpoint)
-- [ ] Enable the `vector` extension later in a migration, not by hand
-
+- [x] Create `app/db/session.py` with an async engine and a session factory
+- [x] Run a trivial `SELECT 1` through the async session (loose script or temporary endpoint)
+- [] Enable the `vector` extension later in a migration, not by hand
+  
 **Done when:** a script opens an async session against the Compose DB and `SELECT 1` returns.
 
 **Gotcha:** the Postgres volume keeps the password from the first start. Changing it requires `down -v`.
