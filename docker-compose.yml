@@ -1,0 +1,37 @@
+services:
+  api:
+    build:
+      context: .
+      target: builder
+    ports:
+      - "${API_PORT}:${API_PORT}"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      WATCHFILES_FORCE_POLLING: "true"
+      DATABASE_URL: ${DATABASE_URL}
+      DEBUG: ${DEBUG}
+      API_PORT: ${API_PORT}
+      OPEN_ROUTER_API_KEY: ${OPEN_ROUTER_API_KEY}
+    command: sh -c "uvicorn app.main:app --host ${API_HOST} --port ${API_PORT} --reload"
+    volumes:
+      - ./app:/app/app
+      
+  db:
+    image: pgvector/pgvector:0.8.6-pg17-bookworm
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${DB_PORT}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+volumes:
+  postgres_data:
