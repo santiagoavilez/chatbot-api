@@ -18,4 +18,19 @@ dev = [
     "httpx>=0.28.1",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
+    "ruff>=0.16.10",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes (unused imports, undefined variables)
+    "I",   # isort (import order)
+    "UP",  # pyupgrade (Python modern syntax)
+    "B",   # bugbear (common errors)
+    "ASYNC", # bad practices in async code
 ]
