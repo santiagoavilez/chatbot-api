@@ -2,7 +2,7 @@
 
 Step-by-step build plan for a simple ChatGPT/Claude-style chat API. Work through the phases in order: each one depends on the previous one. Tick the boxes as you go and update **Current phase**.
 
-**Current phase: 3 Repository layer**
+**Current phase: 2 Models (SQLAlchemy + Alembic) and schemas (Pydantic v2)**
 
 | Phase | Goal                                                    | Status |
 | -------| ---------------------------------------------------------| --------|
@@ -47,7 +47,7 @@ Prove the stack works end to end before modeling anything.
 - [x] `docker compose down -v && docker compose up --build`, then confirm `/health` and `/docs`
 - [x] Create `app/db/session.py` with an async engine and a session factory
 - [x] Run a trivial `SELECT 1` through the async session (loose script or temporary endpoint)
-- [] Enable the `vector` extension later in a migration, not by hand
+- [ ] Enable the `vector` extension later in a migration, not by hand
   
 **Done when:** a script opens an async session against the Compose DB and `SELECT 1` returns.
 
