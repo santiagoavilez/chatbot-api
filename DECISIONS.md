@@ -107,3 +107,58 @@ Status values: **Accepted**, **Superseded**, **Deferred**.
 **Consequences.**
 - No unused configuration implying features that do not exist.
 - Must be revisited as part of V1 authentication work; `JWT_SECRET` should be required with no default.
+
+
+## 8. Title starts as nullable
+
+**Status:** Accepted (2026-10-05)
+
+**Context.** The first message in a conversation is the most important one and the LLM is the one that generates the title, so it should not be required at creation time. It will be updated later when the first message is received.
+
+**Decision.** Use nullable title for conversations.
+
+**Consequences.**
+-We have to handle a null title when listing conversations, and if no title is generated after the first message we can use the id as a fallback.
+-When we need to display the conversation title, we first try to get it from the conversation object, if it's null, we generate it using the first message and update the conversation object. 
+-The title generation may fail, so we need to handle that case with a retry logic.
+-The title generation is a new request that needs to be made using the first message, so we need to make sure we have the first message before generating the title.
+-The title generation only needs to be made in the first message to no override the user manually updated titles.
+-We need to handle the case where the user manually updates the title after the title generation, in this case we should use the user updated title.
+
+
+## 9. use role as a simple string
+
+**Status:** Accepted (2026-10-06)
+
+**Context.** We have three roles: user, system and assistant. It's not necessary to have a dedicated enum for this.
+
+**Decision.** Use simple strings for the role column in the messages table.
+
+**consequences**
+- will need a pydantic Literal  for the role column in the API
+- will need to handle the case where the role is not one of the expected values in the API
+
+
+## 10. use server_default=func.clock_timestamp() instead of server_default=func.now() for the message created_at
+
+**Status:** Accepted (2026-10-06)
+
+**Context.** The server_default=func.now() return the time when the transaction was started, not when the message was created. We need to use the time when the message was created.
+
+**Decision.** Use server_default=func.clock_timestamp() for the message created_at column.
+
+**Consequences.**
+- the messages created_at will be more accurate
+
+
+## 11. Message role has to be constraint to ['user', 'system', 'assistant', 'tool']
+
+**Status:** Accepted (2026-10-11)
+
+**Context.** The message role is used to identify the role of the message sender and it should be one of the following values: 'user', 'system', 'assistant', 'tool'.
+
+**Decision.** Use a CheckConstraint to constraint the message role to ['user', 'system', 'assistant', 'tool'].
+
+**Consequences.**
+- the messages role will be more accurate
+- 'banana', 'apple' will not be accepted as a role

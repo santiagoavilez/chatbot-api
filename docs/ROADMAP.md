@@ -64,12 +64,12 @@ Two different model families. Do not mix them.
 
 ### Tables
 
-- [ ] `Conversation`: `id` (UUID), `title`, `created_at`, `updated_at`
-- [ ] `Message`: `id` (UUID), `conversation_id` (FK, `ON DELETE CASCADE`), `role` (`system` | `user` | `assistant`), `content`, `created_at`
-- [ ] Index on `messages(conversation_id, created_at)`
-- [ ] Relationship `Conversation.messages` ordered by `created_at`
-- [ ] Alembic initialized and configured for the async engine
-- [ ] First migration generated, **read by you**, and applied
+- [x] `Conversation`: `id` (UUID), `title`, `created_at`, `updated_at`
+- [x] `Message`: `id` (UUID), `conversation_id` (FK, `ON DELETE CASCADE`), `role` (`system` | `user` | `assistant`), `content`, `created_at`
+- [x] Index on `messages(conversation_id, created_at)`
+- [x] Relationship `Conversation.messages` ordered by `created_at`
+- [x] Alembic initialized and configured for the async engine
+- [x] First migration generated, **read by you**, and applied
 
 ### Schemas (Pydantic v2)
 
