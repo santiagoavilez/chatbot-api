@@ -15,6 +15,9 @@ RUN uv sync --frozen --no-dev --no-install-project
 # Copy source code
 COPY app/ ./app/
 
+COPY ./alembic /app/alembic
+COPY ./alembic.ini /app/alembic.ini
+
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
