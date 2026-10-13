@@ -1,9 +1,8 @@
-from sqlalchemy import CheckConstraint
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import UUID, DateTime, ForeignKey, Index, String, Text, func
+from sqlalchemy import UUID, CheckConstraint, DateTime, ForeignKey, Index, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -21,6 +20,7 @@ class Message(Base):
     )
     content: Mapped[str] = mapped_column(Text)
     role: Mapped[str] = mapped_column(String(12))
+    model: Mapped[str | None] = mapped_column(String(100))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.clock_timestamp()
     )
@@ -28,4 +28,9 @@ class Message(Base):
     __table_args__ = (
         Index("ix_messages_conversation_id_created_at", "conversation_id", "created_at"),
         CheckConstraint("role IN ('user', 'system', 'assistant', 'tool')", name="ck_messages_role"),
+        CheckConstraint(
+            "(role IN ('assistant', 'tool') AND model IS NOT NULL) OR "
+            "(role IN ('user', 'system') AND model IS NULL)",
+            name="ck_messages_model",
+        ),
     )
