@@ -92,6 +92,11 @@ Status values: **Accepted**, **Superseded**, **Deferred**.
 
 **Decision.** Declare all settings in `app/config.py`. Required values have no default; secrets use `SecretStr`.
 
+**Alternatives considered.**
+- Reading `os.environ` / `os.getenv` directly: no dependency, but every value is an untyped string, validation is scattered across the code and a missing variable only fails when it is first used.
+- `python-dotenv` alone: loads the `.env` file, but provides no types, validation or required-value checks.
+- Config files (YAML/TOML, or libraries such as Dynaconf): good for large layered configurations, but they add a second source of truth next to environment variables, which Docker and hosting platforms already use.
+
 **Consequences.**
 - A missing required variable stops the app at startup.
 - Variables are added when code uses them, so documentation stays truthful.
@@ -103,6 +108,10 @@ Status values: **Accepted**, **Superseded**, **Deferred**.
 **Context.** Authentication and browser access are required before exposing the API, but neither is implemented.
 
 **Decision.** Do not declare `JWT_SECRET`, `JWT_EXPIRATION_TIME` or `CORS_ORIGINS` until the features are built. They are listed as planned in [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
+
+**Alternatives considered.**
+- Declaring the variables now with placeholder defaults: the configuration would suggest features that do not exist, and a default `JWT_SECRET` is a security risk if it ever reaches production.
+- Implementing authentication and CORS now: out of scope for the current phases, and it would slow down the core chat flow without any client that needs it yet.
 
 **Consequences.**
 - No unused configuration implying features that do not exist.
@@ -117,6 +126,11 @@ Status values: **Accepted**, **Superseded**, **Deferred**.
 
 **Decision.** Use nullable title for conversations.
 
+**Alternatives considered.**
+- Required title at creation: forces the client to invent a title before the conversation has any content, which is not how ChatGPT/Claude-style chats behave.
+- Non-null column with a placeholder default (for example `"New conversation"`): avoids null handling, but a placeholder cannot be told apart reliably from a title the user chose, so the app would not know whether a title still needs to be generated.
+- Deriving the title by truncating the first message, without the LLM: cheap and instant, but lower quality. It remains useful as a fallback if generation fails.
+
 **Consequences.**
 -We have to handle a null title when listing conversations, and if no title is generated after the first message we can use the id as a fallback.
 -When we need to display the conversation title, we first try to get it from the conversation object, if it's null, we generate it using the first message and update the conversation object. 
@@ -130,9 +144,13 @@ Status values: **Accepted**, **Superseded**, **Deferred**.
 
 **Status:** Accepted (2026-10-06)
 
-**Context.** We have three roles: user, system and assistant. It's not necessary to have a dedicated enum for this.
+**Context.** We have four roles: user, system, assistant and tool. It's not necessary to have a dedicated enum for this.
 
 **Decision.** Use simple strings for the role column in the messages table.
+
+**Alternatives considered.**
+- Native PostgreSQL `ENUM` type (SQLAlchemy `Enum`): type safety in the database, but adding a value needs an `ALTER TYPE` migration, removing one is hard, and Alembic autogenerate does not detect enum value changes.
+- A separate `roles` lookup table with a foreign key: fully relational, but an extra table and join for a small, fixed set of values.
 
 **consequences**
 - will need a pydantic Literal  for the role column in the API
@@ -147,6 +165,12 @@ Status values: **Accepted**, **Superseded**, **Deferred**.
 
 **Decision.** Use server_default=func.clock_timestamp() for the message created_at column.
 
+**Alternatives considered.**
+- `func.now()`: the time the transaction started. Messages saved in the same transaction (for example the user message and the assistant reply) get the same timestamp, so ordering by `created_at` (used by `Conversation.messages` and the `ix_messages_conversation_id_created_at` index) becomes ambiguous.
+- `func.statement_timestamp()`: differs per statement, but SQLAlchemy can batch several rows into one `INSERT`, and those rows would share the same value.
+- A Python-side default (`datetime.now(timezone.utc)`): works without the database, but depends on each app server's clock, which can drift between instances.
+- An extra auto-increment column only for ordering: guarantees a strict order even when timestamps tie, at the cost of an extra column. Not needed for now.
+
 **Consequences.**
 - the messages created_at will be more accurate
 
@@ -159,6 +183,31 @@ Status values: **Accepted**, **Superseded**, **Deferred**.
 
 **Decision.** Use a CheckConstraint to constraint the message role to ['user', 'system', 'assistant', 'tool'].
 
+**Alternatives considered.**
+- Validating only in the API with the Pydantic `Literal`: simpler, but it does not protect against writes that bypass the API (scripts, migrations, manual SQL).
+- Native PostgreSQL `ENUM` type: the same guarantee, but harder to change later (see decision 9).
+- A lookup table with a foreign key: also enforces valid values, but adds a table and a join for four fixed values.
+
 **Consequences.**
 - the messages role will be more accurate
 - 'banana', 'apple' will not be accepted as a role
+
+
+
+## 12. Store the generating model per message
+
+**Status** Accepted (2026-10-13)
+
+**Context.** The model column is used to identify the model used to generate the message only in assistant and tool cases, not for user input, so it can be null for user messages.
+
+**Decision.** The model column will be nullable in the message table, and it will be only filled when the role is assistant or tool, using a constraint check. We need traceability and to know which model generated each message, this will help us to debug and to understand the behavior of the chatbot, and to analyze which models are performing better.
+
+**Alternatives considered.**
+- Storing the model on the conversation: simpler, but a conversation can switch models between messages, so per-message traceability would be lost.
+- Not storing it and relying on logs or the OpenRouter dashboard: no schema change, but that data cannot be joined with messages and depends on external retention.
+- A generic JSON `metadata` column: flexible for future fields (tokens, latency, cost), but untyped and harder to constrain, index and query.
+
+**Consequences**
+- added a new migration in alembic for the model column in the message table
+- will need a pydantic Literal for the model column in the createMessage schema
+- will need an config layer in the future to manage the allowed models
