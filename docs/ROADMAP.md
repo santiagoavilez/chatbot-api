@@ -73,8 +73,8 @@ Two different model families. Do not mix them.
 
 ### Schemas (Pydantic v2)
 
-- [ ] `ConversationCreate`, `ConversationRead`, `ConversationUpdate`
-- [ ] `MessageCreate`, `MessageRead`
+- [x] `ConversationCreate`, `ConversationRead`, `ConversationUpdate`
+- [x] `MessageCreate`, `MessageRead`
 - [ ] `ChatRequest` (user content, optional model), `ChatResponse`
 - [ ] `role` as a `Literal` or `Enum`, not a free string
 - [ ] Field constraints (`min_length`, `max_length`) on user input
