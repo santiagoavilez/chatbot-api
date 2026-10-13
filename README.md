@@ -41,7 +41,13 @@ A chat completion API in the style of ChatGPT and Claude, built with FastAPI and
    docker compose up
    ```
 
-4. Verify:
+4. Apply the database migrations (needed on the first start and after pulling new migrations):
+
+   ```bash
+   docker compose exec api alembic upgrade head
+   ```
+
+5. Verify:
 
    - Health check: <http://localhost:8000/health> returns `{"status": "ok"}`
    - Interactive API docs: <http://localhost:8000/docs>
@@ -63,7 +69,12 @@ docker compose up --build
 | Stop | `docker compose down` |
 | Restart | `docker compose restart` |
 | Rebuild images | `docker compose build` |
-| **Reset the database (destroys all data)** | `docker compose down -v && docker compose up -d` |
+| Apply database migrations | `docker compose exec api alembic upgrade head` |
+| Generate a migration from model changes | `docker compose exec api alembic revision --autogenerate -m "message"` |
+| Check the database connection | `docker compose exec api python -m app.db.check_db` |
+| **Reset the database (destroys all data)** | `docker compose down -v && docker compose up -d`, then apply migrations |
+
+Migrations workflow, review checklist and the full command reference: [docs/MIGRATIONS.md](docs/MIGRATIONS.md).
 
 ## Local development without Docker
 
@@ -90,7 +101,10 @@ uv run pytest
 ├── bruno-collection/    # Bruno API client collection for manual testing
 ├── docs/
 │   ├── ARCHITECTURE.md  # System design and V2 direction
-│   └── CONFIGURATION.md # Environment variable reference
+│   ├── ASYNC.md         # How async, SQLAlchemy and greenlet fit together
+│   ├── CONFIGURATION.md # Environment variable reference
+│   ├── MIGRATIONS.md    # Alembic workflow and database commands
+│   └── ROADMAP.md       # Step-by-step build plan
 ├── DECISIONS.md         # Architecture decision records
 ├── Dockerfile
 ├── docker-compose.yml
@@ -112,8 +126,6 @@ uv run pytest
 | Tests | pytest, pytest-asyncio, httpx |
 
 The reasoning behind each choice is recorded in [DECISIONS.md](DECISIONS.md).
-
-> SQLAlchemy, asyncpg and Alembic are declared as dependencies but are not wired into the app yet.
 
 ## Roadmap
 
