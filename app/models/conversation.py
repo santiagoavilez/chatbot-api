@@ -13,6 +13,10 @@ if TYPE_CHECKING:
 
 class Conversation(Base):
     __tablename__ = "conversations"
+    __mapper_args__ = {
+        "eager_defaults": True
+    }  # fetch server-generated updated_at via RETURNING on flush, so reading it
+    # after an update doesn't trigger a lazy load (MissingGreenlet in async)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     title: Mapped[str | None] = mapped_column(String(120))
@@ -26,3 +30,6 @@ class Conversation(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+
+    def __repr__(self) -> str:
+        return f"Conversation(id={self.id!r}, title={self.title!r})"
