@@ -2,15 +2,15 @@
 
 Step-by-step build plan for a simple ChatGPT/Claude-style chat API. Work through the phases in order: each one depends on the previous one. Tick the boxes as you go and update **Current phase**.
 
-**Current phase: 2 Models (SQLAlchemy + Alembic) and schemas (Pydantic v2)**
+**Current phase: 4 OpenRouter client**
 
 | Phase | Goal                                                    | Status |
 | -------| ---------------------------------------------------------| --------|
 | 0     | Foundation (scaffolding, Docker, config, docs)          | Done   |
 | 1     | Verify the database starts and connects                 | Done   |
-| 2     | Models (SQLAlchemy + Alembic) and schemas (Pydantic v2) | Next   |
-| 3     | Repository layer                                        | Todo   |
-| 4     | OpenRouter client                                       | Todo   |
+| 2     | Models (SQLAlchemy + Alembic) and schemas (Pydantic v2) | Done   |
+| 3     | Repository layer                                        | Done   |
+| 4     | OpenRouter client                                       | Next   |
 | 5     | Conversations CRUD                                      | Todo   |
 | 6     | Chat endpoint (the core)                                | Todo   |
 | 7     | Error handling                                          | Todo   |
@@ -38,7 +38,7 @@ Step-by-step build plan for a simple ChatGPT/Claude-style chat API. Work through
 
 ---
 
-## Phase 1: Verify the database
+## Phase 1: Verify the database (done)
 
 Prove the stack works end to end before modeling anything.
 
@@ -47,7 +47,7 @@ Prove the stack works end to end before modeling anything.
 - [x] `docker compose down -v && docker compose up --build`, then confirm `/health` and `/docs`
 - [x] Create `app/db/session.py` with an async engine and a session factory
 - [x] Run a trivial `SELECT 1` through the async session (loose script or temporary endpoint)
-- [ ] Enable the `vector` extension later in a migration, not by hand
+- [x] Enable the `vector` extension later in a migration, not by hand
   
 **Done when:** a script opens an async session against the Compose DB and `SELECT 1` returns.
 
@@ -55,7 +55,7 @@ Prove the stack works end to end before modeling anything.
 
 ---
 
-## Phase 2: Models and schemas
+## Phase 2: Models and schemas (done)
 
 Two different model families. Do not mix them.
 
@@ -71,14 +71,14 @@ Two different model families. Do not mix them.
 - [x] Alembic initialized and configured for the async engine
 - [x] First migration generated, **read by you**, and applied
 
-### Schemas (Pydantic v2)
+### Schemas (Pydantic v2) (done)
 
 - [x] `ConversationCreate`, `ConversationRead`, `ConversationUpdate`
 - [x] `MessageCreate`, `MessageRead`
-- [ ] `ChatRequest` (user content, optional model), `ChatResponse`
-- [ ] `role` as a `Literal` or `Enum`, not a free string
-- [ ] Field constraints (`min_length`, `max_length`) on user input
-- [ ] Read schemas use `model_config = ConfigDict(from_attributes=True)` so they accept ORM objects
+- [x] `ChatRequest` (user content, optional model), `ChatResponse`
+- [x] `role` as a `Literal` or `Enum`, not a free string
+- [x] Field constraints (`min_length`, `max_length`) on user input
+- [x] Read schemas use `model_config = ConfigDict(from_attributes=True)` so they accept ORM objects
 
 **Done when:** you can create and read rows from a script, and the migration applies cleanly on an empty database.
 
@@ -88,22 +88,23 @@ Two different model families. Do not mix them.
 
 ---
 
-## Phase 3: Repository layer
+## Phase 3: Repository layer (done)
 
 All SQL lives here. Services never write queries.
 
-- [ ] `ConversationRepository`: `create`, `get`, `list` (paginated), `update_title`, `delete`
-- [ ] `MessageRepository`: `add`, `list_by_conversation` (ordered, optionally last N)
-- [ ] Repositories receive an `AsyncSession`; they do not create sessions or commit on their own
-- [ ] FastAPI dependency `get_session` that yields a session per request
-- [ ] Define the transaction boundary (one commit per request, in the service or dependency)
-- [ ] Return `None` (or raise a domain error) for missing rows; do not return HTTP errors from here
+- [x] `ConversationRepository`: `create`, `get`, `list` (paginated), `update_title`, `delete`
+- [x] `MessageRepository`: `add`, `list_by_conversation` (ordered, optionally last N)
+- [x] Repositories receive an `AsyncSession`; they do not create sessions or commit on their own
+- [x] FastAPI dependency `get_db` that yields a session per request
+- [x] Define the transaction boundary (two commit per request, in the service or dependency)
+ **Every chat request has two commits:** one before sending the prompt to the LLM and one before returning the response to the client.
+- [x] Return `None` (or raise a domain error) for missing rows; do not return HTTP errors from here
 
 **Done when:** each method is exercised against a real test database.
 
 ---
 
-## Phase 4: OpenRouter client
+## Phase 4: OpenRouter client (next)
 
 Separate module. Prove it with a loose script before any endpoint uses it.
 
