@@ -34,3 +34,9 @@ class Message(Base):
             name="ck_messages_model",
         ),
     )
+
+    def __repr__(self) -> str:
+        return (
+            f"Message(id={self.id!r}, conversation_id={self.conversation_id!r}, "
+            f"role={self.role!r}, model={self.model!r})"
+        )
