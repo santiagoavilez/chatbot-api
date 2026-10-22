@@ -79,6 +79,22 @@ Follow one request through the real files.
    LLM client. `tests/api/test_messages.py` overrides `get_chat_service` with a fake service and
    calls the app through `httpx.ASGITransport`.
 
+## Starting a new chat
+
+`POST /conversations/messages` (no id) is the "new chat" entry point. It takes the same
+`ChatRequest` body, creates a conversation, runs the first turn and returns `201` with the
+assistant `MessageRead`; its `conversation_id` is the id of the new conversation.
+
+- **Route:** `app/api/messages.py` (`start_conversation`). It has two path segments, so it never
+  matches `/{conversation_id}/messages`.
+- **Service:** `ChatService.start_conversation` creates the conversation and delegates to the
+  same private `_run_turn` used by `send_message`, so the turn logic exists once.
+- **Failures:** the conversation and user message are committed before the model call. If the
+  provider fails, the domain exception carries `conversation_id` and `app/api/errors.py` adds it
+  to the error body (`{"detail": "...", "conversation_id": "..."}`), so the client can retry on
+  `POST /conversations/{conversation_id}/messages`. See decision 19 in
+  [DECISIONS.md](../DECISIONS.md).
+
 ## Writing the conversation CRUD
 
 Create `app/api/conversations.py` with its own `APIRouter(prefix="/conversations",

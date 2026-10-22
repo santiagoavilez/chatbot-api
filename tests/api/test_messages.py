@@ -23,6 +23,26 @@ class FakeChatService:
     def __init__(self, error: Exception | None = None) -> None:
         self.error = error
         self.calls: list[tuple[uuid.UUID, str, str]] = []
+        self.started: list[tuple[str, str]] = []
+        self.new_id = uuid.uuid4()
+
+    async def start_conversation(self, content: str, model: str) -> Message:
+        self.started.append((content, model))
+        if self.error:
+            if isinstance(self.error, LLMProviderError):
+                self.error.conversation_id = self.new_id
+            raise self.error
+        return await self._reply(self.new_id, model)
+
+    async def _reply(self, conversation_id: uuid.UUID, model: str) -> Message:
+        return Message(
+            id=uuid.uuid4(),
+            conversation_id=conversation_id,
+            content="hello back",
+            role="assistant",
+            model=model,
+            created_at=datetime.now(UTC),
+        )
 
     async def send_message(self, conversation_id: uuid.UUID, content: str, model: str) -> Message:
         self.calls.append((conversation_id, content, model))
@@ -139,3 +159,55 @@ async def test_invalid_body_returns_422(client, payload):
 
     assert response.status_code == 422
     assert service.calls == []
+
+
+NEW_URL = "/conversations/messages"
+
+
+async def test_start_conversation_returns_201_with_new_conversation_id(client):
+    service = FakeChatService()
+    use_service(service)
+
+    response = await client.post(NEW_URL, json={"content": "hi", "model": MODEL})
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["conversation_id"] == str(service.new_id)
+    assert body["role"] == "assistant"
+    assert service.started == [("hi", MODEL)]
+    assert service.calls == []
+
+
+async def test_start_conversation_error_body_includes_conversation_id_and_generic_detail(client):
+    service = FakeChatService(LLMServerError(PROVIDER_SECRET, 500))
+    use_service(service)
+
+    response = await client.post(NEW_URL, json={"content": "hi", "model": MODEL})
+
+    assert response.status_code == 502
+    body = response.json()
+    assert body["conversation_id"] == str(service.new_id)
+    assert "sk-or" not in response.text
+    assert "provider said" not in response.text
+
+
+async def test_send_message_error_body_has_no_conversation_id(client):
+    use_service(FakeChatService(LLMServerError("x", 500)))
+
+    response = await client.post(url(), json={"content": "hi", "model": MODEL})
+
+    assert "conversation_id" not in response.json()
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [{"content": "", "model": MODEL}, {"content": "hi", "model": "not/allowed"}, {}],
+)
+async def test_start_conversation_invalid_body_returns_422(client, payload):
+    service = FakeChatService()
+    use_service(service)
+
+    response = await client.post(NEW_URL, json=payload)
+
+    assert response.status_code == 422
+    assert service.started == []

@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.clients.llm import ChatMessage, ChatResult
-from app.core.exceptions import ConversationNotFoundError, LLMServerError
+from app.core.exceptions import ConversationNotFoundError, LLMServerError, LLMTimeoutError
 from app.models import Message
 from app.services.chat import ChatService
 
@@ -23,12 +23,19 @@ class FakeSession:
 
 
 class FakeConversationRepository:
-    def __init__(self, conversation: object | None) -> None:
+    def __init__(self, conversation: object | None, events: list[str] | None = None) -> None:
         self.conversation = conversation
+        self.events = events if events is not None else []
+        self.created: SimpleNamespace | None = None
         self.touched = 0
 
     async def get(self, conversation_id: uuid.UUID) -> object | None:
         return self.conversation
+
+    async def create(self, title: str | None) -> SimpleNamespace:
+        self.created = SimpleNamespace(id=uuid.uuid4(), title=title)
+        self.events.append("create")
+        return self.created
 
     async def touch(self, conversation: object) -> None:
         self.touched += 1
@@ -97,7 +104,9 @@ class Harness:
     def __init__(self, *, found: bool = True, llm_error: Exception | None = None, limit: int = 20):
         self.events: list[str] = []
         self.session = FakeSession(self.events)
-        self.conversations = FakeConversationRepository(SimpleNamespace() if found else None)
+        self.conversations = FakeConversationRepository(
+            SimpleNamespace(id=uuid.uuid4()) if found else None, self.events
+        )
         self.messages = FakeMessageRepository(self.events)
         self.metrics = FakeMetricRepository()
         self.llm = FakeLLM(self.events, llm_error)
@@ -190,3 +199,47 @@ async def test_assistant_message_uses_model_reported_by_provider():
     result = await h.service.send_message(uuid.uuid4(), "hi", MODEL)
 
     assert result.model == "provider/reported-model"
+
+
+async def test_start_conversation_creates_conversation_and_returns_assistant_message():
+    h = Harness()
+
+    result = await h.service.start_conversation("hi", MODEL)
+
+    assert h.conversations.created is not None
+    assert h.conversations.created.title is None
+    assert result.role == "assistant"
+    assert result.conversation_id == h.conversations.created.id
+    assert [m.role for m in h.messages.stored] == ["user", "assistant"]
+    assert len(h.metrics.added) == 1
+    assert h.session.commits == 2
+
+
+async def test_start_conversation_commits_conversation_with_user_message_before_llm():
+    h = Harness()
+
+    await h.service.start_conversation("hi", MODEL)
+
+    assert h.events[:3] == ["create", "add:user", "commit"]
+    assert h.events.index("commit") < h.events.index("llm")
+
+
+async def test_start_conversation_llm_failure_keeps_data_and_exposes_conversation_id():
+    h = Harness(llm_error=LLMTimeoutError("slow"))
+
+    with pytest.raises(LLMTimeoutError) as exc_info:
+        await h.service.start_conversation("hi", MODEL)
+
+    assert h.conversations.created is not None
+    assert exc_info.value.conversation_id == h.conversations.created.id
+    assert [m.role for m in h.messages.stored] == ["user"]
+    assert h.session.commits == 1
+
+
+async def test_send_message_failure_does_not_attach_conversation_id():
+    h = Harness(llm_error=LLMServerError("boom"))
+
+    with pytest.raises(LLMServerError) as exc_info:
+        await h.service.send_message(uuid.uuid4(), "hi", MODEL)
+
+    assert exc_info.value.conversation_id is None

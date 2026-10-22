@@ -3,8 +3,8 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clients.llm import ChatMessage, LLMClient
-from app.core.exceptions import ConversationNotFoundError
-from app.models import Message
+from app.core.exceptions import ConversationNotFoundError, LLMProviderError
+from app.models import Conversation, Message
 from app.repositories.conversation import ConversationRepository
 from app.repositories.message import MessageRepository
 from app.repositories.message_metric import MessageMetricRepository
@@ -40,7 +40,24 @@ class ChatService:
         conversation = await self._conversations.get(conversation_id)
         if conversation is None:
             raise ConversationNotFoundError(f"Conversation {conversation_id} not found")
+        return await self._run_turn(conversation, content, model)
 
+    async def start_conversation(self, content: str, model: str) -> Message:
+        """Create a conversation and run its first turn.
+
+        The conversation is committed together with the user message. If the provider
+        fails, they stay saved and the error carries the new ``conversation_id``.
+        """
+        conversation = await self._conversations.create(title=None)
+        conversation_id = conversation.id
+        try:
+            return await self._run_turn(conversation, content, model)
+        except LLMProviderError as exc:
+            exc.conversation_id = conversation_id
+            raise
+
+    async def _run_turn(self, conversation: Conversation, content: str, model: str) -> Message:
+        conversation_id = conversation.id
         await self._messages.add(content, conversation_id, role="user", model=None)
         await self._conversations.touch(conversation)
         await self._session.commit()

@@ -165,6 +165,7 @@ Decisions to make and write down in [DECISIONS.md](../DECISIONS.md):
 - [x] History limits: cap by message count or approximate tokens so long conversations do not exceed the model context
 - [ ] Auto-title the conversation from the first message (optional)
 
+- [x] Start a new chat with `POST /conversations/messages` (decision 19)
 - [x] Metrics step: persist generation id, finish reason, token counts, cost and latency in a 1:1 `message_metrics` row (decision 14)
 
 Guide for the CRUD endpoints: [ENDPOINTS.md](ENDPOINTS.md).

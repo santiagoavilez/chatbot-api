@@ -63,7 +63,11 @@ async def _handle_domain_error(request: Request, exc: Exception) -> JSONResponse
     retry_after = getattr(exc, "retry_after", None)
     if isinstance(exc, LLMRateLimitError) and retry_after is not None:
         headers = {"Retry-After": str(math.ceil(retry_after))}
-    return JSONResponse({"detail": detail}, status_code=status_code, headers=headers)
+    body: dict[str, str] = {"detail": detail}
+    conversation_id = getattr(exc, "conversation_id", None)
+    if conversation_id is not None:
+        body["conversation_id"] = str(conversation_id)
+    return JSONResponse(body, status_code=status_code, headers=headers)
 
 
 def register_exception_handlers(app: FastAPI) -> None:

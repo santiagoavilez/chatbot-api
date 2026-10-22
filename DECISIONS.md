@@ -312,3 +312,21 @@ Status values: **Accepted**, **Superseded**, **Deferred**.
 **Consequences.**
 - Long conversations lose older context.
 - A token-based cap or summarization can replace this later without changing the endpoint.
+
+## 19. Start a new chat with `POST /conversations/messages`
+
+**Status:** Accepted (2026-10-22)
+
+**Context.** Clients need a "new chat" action (like `/new`) without creating an empty conversation first and without knowing an id.
+
+**Decision.** `POST /conversations/messages` takes the same body as the existing message endpoint, creates the conversation (title `None`) and runs the first turn through the shared `ChatService._run_turn`. The conversation and user message are committed together before the model call. If the provider fails, they stay saved (decision 16) and the exception carries `conversation_id`, which the API adds to the error body next to the generic `detail`.
+
+**Alternatives considered.**
+- Requiring `POST /conversations` first: two calls and possible empty conversations, but no new route.
+- Rolling back the conversation on failure: no orphan conversation, but the user loses their message and the transaction would stay open during the model call.
+- Returning the id only in a header: works, but a JSON field is easier for clients to read.
+
+**Consequences.**
+- A failed first turn leaves a conversation with one user message and no answer; the client retries on the existing endpoint using the returned id.
+- Error bodies of this route may contain `conversation_id`; the provider message is still never echoed.
+- The domain stays HTTP-free: it only sets an attribute on the exception.
