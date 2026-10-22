@@ -1,4 +1,5 @@
 import time
+from collections.abc import Sequence
 
 import httpx
 from pydantic import BaseModel, ValidationError
@@ -53,7 +54,7 @@ class OpenRouterClient:
     def __init__(self, http_client: httpx.AsyncClient) -> None:
         self._http_client = http_client
 
-    async def chat(self, messages: list[ChatMessage], model: str) -> ChatResult:
+    async def chat(self, messages: Sequence[ChatMessage], model: str) -> ChatResult:
 
         messages_dict = [m.model_dump() for m in messages]
         payload = {"model": model, "messages": messages_dict}

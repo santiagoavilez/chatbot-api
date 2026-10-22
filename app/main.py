@@ -20,13 +20,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
 
     try:
-        app.state.http_client.aclose()
-        await asyncio.sleep(0.1)
+        await app.state.http_client.aclose()
         await engine.dispose()
     except Exception:
         logger.exception("Error closing HTTP client")
-    finally:
-        pass
 
 
 app = FastAPI(title="Chatbot API", version="0.1.0", lifespan=lifespan)
