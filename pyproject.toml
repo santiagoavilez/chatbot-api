@@ -35,3 +35,7 @@ select = [
     "B",   # bugbear (common errors)
     "ASYNC", # bad practices in async code
 ]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

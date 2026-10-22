@@ -8,6 +8,8 @@ from fastapi import Depends, FastAPI, HTTPException, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.errors import register_exception_handlers
+from app.api.messages import router as messages_router
 from app.clients.http import create_openrouter_http_client
 from app.db.session import engine, get_db
 
@@ -27,6 +29,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Chatbot API", version="0.1.0", lifespan=lifespan)
+register_exception_handlers(app)
+app.include_router(messages_router)
 logger = logging.getLogger(__name__)
 
 

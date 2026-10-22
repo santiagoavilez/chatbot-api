@@ -103,6 +103,7 @@ uv run pytest
 │   ├── ARCHITECTURE.md  # System design and V2 direction
 │   ├── ASYNC.md         # How async, SQLAlchemy and greenlet fit together
 │   ├── CONFIGURATION.md # Environment variable reference
+│   ├── ENDPOINTS.md     # Guide to writing endpoints (chat endpoint as example)
 │   ├── MIGRATIONS.md    # Alembic workflow and database commands
 │   └── ROADMAP.md       # Step-by-step build plan
 ├── DECISIONS.md         # Architecture decision records

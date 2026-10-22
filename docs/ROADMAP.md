@@ -2,7 +2,7 @@
 
 Step-by-step build plan for a simple ChatGPT/Claude-style chat API. Work through the phases in order: each one depends on the previous one. Tick the boxes as you go and update **Current phase**.
 
-**Current phase: 4 OpenRouter client**
+**Current phase: 5 Conversations CRUD**
 
 | Phase | Goal                                                    | Status |
 | -------| ---------------------------------------------------------| --------|
@@ -10,9 +10,9 @@ Step-by-step build plan for a simple ChatGPT/Claude-style chat API. Work through
 | 1     | Verify the database starts and connects                 | Done   |
 | 2     | Models (SQLAlchemy + Alembic) and schemas (Pydantic v2) | Done   |
 | 3     | Repository layer                                        | Done   |
-| 4     | OpenRouter client                                       | Next   |
+| 4     | OpenRouter client                                       | Done   |
 | 5     | Conversations CRUD                                      | Todo   |
-| 6     | Chat endpoint (the core)                                | Todo   |
+| 6     | Chat endpoint (the core)                                | Done   |
 | 7     | Error handling                                          | Todo   |
 | 8     | Tests                                                   | Todo   |
 | 9     | Streaming (SSE)                                         | Todo   |
@@ -104,19 +104,19 @@ All SQL lives here. Services never write queries.
 
 ---
 
-## Phase 4: OpenRouter client (next)
+## Phase 4: OpenRouter client (done)
 
 Separate module. Prove it with a loose script before any endpoint uses it.
 
-- [ ] Move `httpx` from dev to main dependencies: `uv add httpx`
-- [ ] Module `app/clients/openrouter.py`
-- [ ] One reused `httpx.AsyncClient` (created at app startup via `lifespan`, closed at shutdown). Never create a client per request.
-- [ ] Base URL, `Authorization: Bearer <key>` header, and default timeouts set on the client
-- [ ] Explicit timeouts (connect, read, total). The default is not enough for LLM calls.
-- [ ] Method `chat(messages, model) -> str` for non-streaming
-- [ ] Map provider failures to domain exceptions (timeout, 429, 5xx, invalid response)
-- [ ] Loose script: send a real prompt and print the answer
-- [ ] Define a small interface (Protocol) so services can be tested with a fake client
+- [x] Move `httpx` from dev to main dependencies: `uv add httpx`
+- [x] Module `app/clients/openrouter.py`
+- [x] One reused `httpx.AsyncClient` (created at app startup via `lifespan`, closed at shutdown). Never create a client per request.
+- [x] Base URL, `Authorization: Bearer <key>` header, and default timeouts set on the client
+- [x] Explicit timeouts (connect, read, total). The default is not enough for LLM calls.
+- [x] Method `chat(messages, model) -> ChatResult` for non-streaming
+- [x] Map provider failures to domain exceptions (timeout, 429, 5xx, invalid response)
+- [x] Loose script: send a real prompt and print the answer
+- [x] Define a small interface (Protocol) so services can be tested with a fake client
 
 **Done when:** the script returns a real model answer, and a wrong key or a tiny timeout raises your domain exceptions rather than raw httpx errors.
 
@@ -143,7 +143,7 @@ Plain HTTP and database work, no LLM involved.
 
 ---
 
-## Phase 6: Chat endpoint (the core)
+## Phase 6: Chat endpoint (the core) (done)
 
 This is where everything comes together and what a reviewer looks at first.
 
@@ -151,19 +151,24 @@ This is where everything comes together and what a reviewer looks at first.
 
 Flow, in one service method:
 
-1. [ ] Load the conversation (404 if it does not exist)
-2. [ ] Save the user message
-3. [ ] Build the history from stored messages (ordered; add an optional system prompt)
-4. [ ] Call the model through the OpenRouter client
-5. [ ] Save the assistant message
-6. [ ] Return the assistant message
+1. [x] Load the conversation (404 if it does not exist)
+2. [x] Save the user message
+3. [x] Build the history from stored messages (last 20, ordered; the optional system prompt is not implemented)
+4. [x] Call the model through the OpenRouter client
+5. [x] Save the assistant message and its metrics (tokens, cost, latency, finish reason)
+6. [x] Return the assistant message
 
 Decisions to make and write down in [DECISIONS.md](../DECISIONS.md):
 
-- [ ] What happens if the model call fails after the user message was saved? (keep it and let the user retry, or roll back)
-- [ ] Transaction scope: do not hold a DB transaction open during a slow network call if you can avoid it
-- [ ] History limits: cap by message count or approximate tokens so long conversations do not exceed the model context
+- [x] What happens if the model call fails after the user message was saved? (keep it and let the user retry, or roll back)
+- [x] Transaction scope: do not hold a DB transaction open during a slow network call if you can avoid it
+- [x] History limits: cap by message count or approximate tokens so long conversations do not exceed the model context
 - [ ] Auto-title the conversation from the first message (optional)
+
+- [x] Start a new chat with `POST /conversations/messages` (decision 19)
+- [x] Metrics step: persist generation id, finish reason, token counts, cost and latency in a 1:1 `message_metrics` row (decision 14)
+
+Guide for the CRUD endpoints: [ENDPOINTS.md](ENDPOINTS.md).
 
 **Done when:** a conversation can go back and forth with a real model and the history survives a restart.
 

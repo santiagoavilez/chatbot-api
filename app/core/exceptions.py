@@ -1,3 +1,6 @@
+import uuid
+
+
 class DomainError(Exception):
     """Base class for errors raised by the application's domain layer."""
 
@@ -17,6 +20,9 @@ class LLMProviderError(DomainError):
     def __init__(self, message: str, status_code: int | None = None) -> None:
         super().__init__(message)
         self.status_code = status_code
+        # Set by the service when a failure happens after a new conversation was persisted,
+        # so callers that did not know its id can still find it.
+        self.conversation_id: uuid.UUID | None = None
 
 
 class LLMConnectionError(LLMProviderError):
