@@ -69,5 +69,9 @@ class LLMServerError(LLMProviderError):
     """The provider or an upstream proxy experienced an internal server error or unavailability."""
 
 
+class LLMContentFilterError(LLMProviderError):
+    """The request or response was blocked by moderation policies or safety guardrails."""
+
+
 class LLMInvalidResponseError(LLMProviderError):
     """The provider returned HTTP 200, but the payload was malformed or broke data contracts."""
