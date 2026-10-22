@@ -15,7 +15,9 @@ Declared in `app/config.py`.
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `OPEN_ROUTER_API_KEY` | Yes | none | OpenRouter API key. Stored as `SecretStr` so it is masked in logs and reprs. |
-| `DATABASE_URL` | No | `postgresql://postgres:postgres123@db:5432/chatbotfastapi` | PostgreSQL connection string. The default targets the `db` Compose service and is for local development only. |
+| `OPEN_ROUTER_BASE_URL` | No | `https://openrouter.ai/api/v1` | OpenRouter API base URL. |
+| `OPEN_ROUTER_TIMEOUT` | No | `60` | Read timeout in seconds: how long to wait for the model's response. The connect timeout is fixed and short. |
+| `DATABASE_URL` | No | `postgresql+asyncpg://postgres:postgres@db:5432/chatbotfastapi` | PostgreSQL connection string. The default targets the `db` Compose service and is for local development only. |
 | `DEBUG` | No | `true` | Enables debug behavior. Must be `false` in any shared or production environment. |
 | `API_PORT` | No | `8000` | Port the API listens on. |
 
@@ -25,14 +27,14 @@ Unknown variables are ignored (`extra="ignore"`).
 
 Used by `docker-compose.yml` and the container command, not by `Settings`.
 
-| Variable | Description |
-|---|---|
-| `API_HOST` | Bind address for Uvicorn. Use `0.0.0.0` in containers; `localhost` is not reachable from the host. |
-| `API_PORT` | Port published by Compose and used by Uvicorn. |
-| `DB_PORT` | Host port mapped to PostgreSQL's `5432`. |
-| `POSTGRES_DB` | Database name created on first start. |
-| `POSTGRES_USER` | Database user. |
-| `POSTGRES_PASSWORD` | Database password. Change it for anything beyond local use. |
+| Variable            | Description                                                                                        |
+| ---------------------| ----------------------------------------------------------------------------------------------------|
+| `API_HOST`          | Bind address for Uvicorn. Use `0.0.0.0` in containers; `localhost` is not reachable from the host. |
+| `API_PORT`          | Port published by Compose and used by Uvicorn.                                                     |
+| `DB_PORT`           | Host port mapped to PostgreSQL's `5432`.                                                           |
+| `POSTGRES_DB`       | Database name created on first start.                                                              |
+| `POSTGRES_USER`     | Database user.                                                                                     |
+| `POSTGRES_PASSWORD` | Database password. Change it for anything beyond local use.                                        |
 
 `DATABASE_URL` must be consistent with the `POSTGRES_*` values and the `db` service name.
 
@@ -56,4 +58,4 @@ Not read by the application yet. Add them to `Settings` when the feature lands.
 
 ## Notes
 
-- The Dockerfile copies only `app/`, so `.env` is not inside the image. Inside the container, configuration must arrive through the Compose `environment` block.
+- The Dockerfile doest copy `.env` , so `.env` is not inside the image. Inside the container, configuration must arrive through the Compose `environment` block.

@@ -1,14 +1,32 @@
 import asyncio
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import get_db
+from app.clients.http import create_openrouter_http_client
+from app.db.session import engine, get_db
 
-app = FastAPI(title="Chatbot API", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    # --- startup: runs ONCE, before the first request ---
+    app.state.http_client = create_openrouter_http_client()
+
+    yield
+
+    try:
+        await app.state.http_client.aclose()
+        await engine.dispose()
+    except Exception:
+        logger.exception("Error closing HTTP client")
+
+
+app = FastAPI(title="Chatbot API", version="0.1.0", lifespan=lifespan)
 logger = logging.getLogger(__name__)
 
 
