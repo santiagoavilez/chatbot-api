@@ -211,3 +211,104 @@ Status values: **Accepted**, **Superseded**, **Deferred**.
 - added a new migration in alembic for the model column in the message table
 - will need a pydantic Literal for the model column in the createMessage schema
 - will need an config layer in the future to manage the allowed models
+
+
+
+## 13. httpx and own Pydantic models instead of the OpenRouter SDK
+
+**Status:** Accepted (2026-10-22)
+
+**Context.** The application needs one non-streaming chat call to OpenRouter, normalized into a provider-independent result with typed domain errors.
+
+**Decision.** Call the OpenRouter HTTP API with a shared `httpx.AsyncClient` and validate responses with private Pydantic models in `app/clients/openrouter.py`, behind the `LLMClient` Protocol.
+
+**Alternatives considered.**
+- The OpenRouter or OpenAI SDK: less code for the happy path, but it adds a dependency, hides timeouts and error mapping, and leaks provider types into the domain.
+- Calling `httpx` without response models: no extra classes, but a malformed payload would fail later and far from the cause.
+
+**Consequences.**
+- Full control over timeouts, error mapping and the fields we keep (tokens, cost, finish reason).
+- We maintain the request/response shapes ourselves.
+- Swapping provider means writing another adapter for the Protocol.
+
+## 14. Separate 1:1 `message_metrics` table
+
+**Status:** Accepted (2026-10-22)
+
+**Context.** Each assistant message has generation data (generation id, finish reason, token counts, cost, latency) that user messages never have.
+
+**Decision.** Store it in `message_metrics`, keyed by `message_id` (primary key and foreign key, `ON DELETE CASCADE`).
+
+**Alternatives considered.**
+- Nullable columns on `messages`: one table, but most rows would carry empty columns and `messages` would mix content with telemetry.
+- A generic JSON column: flexible, but untyped and hard to constrain or aggregate.
+
+**Consequences.**
+- `messages` stays lean; metrics can be aggregated without touching content.
+- An extra insert per assistant message, in the same transaction.
+- `cost` is `NUMERIC(12, 8)` and nullable because free models report no cost.
+
+## 15. The service owns the transaction, with two commits around the LLM call
+
+**Status:** Accepted (2026-10-22)
+
+**Context.** A chat turn calls a slow external service. Holding a database transaction (and a pooled connection) open during that call wastes connections and risks idle-in-transaction timeouts.
+
+**Decision.** `ChatService.send_message` saves the user message and commits, calls the model, then saves the assistant message and its metric and commits again. Repositories only `add` and `flush`; they never commit.
+
+**Alternatives considered.**
+- One commit at the end: atomic, but the transaction stays open during the network call and a provider failure loses the user message.
+- Committing in the router or a dependency: hides the use-case boundary in the HTTP layer.
+
+**Consequences.**
+- No transaction is open during the model call.
+- The two writes are not atomic with each other, which decision 16 accepts.
+- `conversations.updated_at` is bumped explicitly (`ConversationRepository.touch`) because `onupdate` does not fire when only messages are inserted.
+
+## 16. A failed LLM call keeps the user message
+
+**Status:** Accepted (2026-10-22)
+
+**Context.** The model call can fail after the user message was committed.
+
+**Decision.** Keep the user message and let the domain exception propagate to the API. The client may retry.
+
+**Alternatives considered.**
+- Deleting the user message on failure: the history stays clean, but it needs compensating writes that can themselves fail, and the user loses what they typed.
+
+**Consequences.**
+- A retry sends the same text again, so history may contain a user message without an answer, or a duplicate after a retry.
+- `finish_reason == "length"` is not a failure: the truncated answer is saved and the reason is recorded in the metric.
+
+## 17. Domain exceptions map to HTTP in the API layer, without leaking provider messages
+
+**Status:** Accepted (2026-10-22)
+
+**Context.** The domain raises typed exceptions and must not know HTTP. Provider error messages can contain internal detail.
+
+**Decision.** `app/api/errors.py` maps exceptions to statuses: not found 404, rate limit 429 (with `Retry-After` when known), timeout 504, blocked content 422, connection/server/invalid response 502, authentication and insufficient credits 503, invalid request 500, any other provider error 502. The body is `{"detail": "<our own message>"}`; the original message is only logged.
+
+**Alternatives considered.**
+- Raising `HTTPException` from services: simpler, but couples the domain to HTTP.
+- Returning the provider message: helpful while debugging, but can leak internals.
+
+**Consequences.**
+- Clients see stable, generic messages.
+- Authentication and credit problems are our problem, so they surface as 503 rather than as a client error.
+- Debugging relies on server logs.
+
+## 18. History sent to the model is capped at 20 messages
+
+**Status:** Accepted (2026-10-22)
+
+**Context.** Sending the full history grows cost and latency and eventually exceeds the model context window.
+
+**Decision.** Send the last 20 messages (`history_limit`, default 20 in `ChatService`). Roles the LLM contract does not accept (`tool`) are skipped.
+
+**Alternatives considered.**
+- Capping by tokens: closer to the real limit, but needs a tokenizer per model.
+- No cap: simplest, but fails on long conversations.
+
+**Consequences.**
+- Long conversations lose older context.
+- A token-based cap or summarization can replace this later without changing the endpoint.
