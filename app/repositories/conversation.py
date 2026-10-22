@@ -1,7 +1,7 @@
 import uuid
 from collections.abc import Sequence
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Conversation
@@ -46,3 +46,8 @@ class ConversationRepository:
         await self.session.delete(conversation)
         await self.session.flush()
         return True
+
+    async def touch(self, conversation: Conversation) -> None:
+        """Bump ``updated_at``; ``onupdate`` does not fire when only messages change."""
+        conversation.updated_at = func.now()
+        await self.session.flush()
