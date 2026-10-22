@@ -13,7 +13,6 @@ AllowedOpenRouterModels = Literal[
     "google/gemma-4-31b-it:free",
     "google/gemma-4-26b-a4b-it:free",
     "nvidia/nemotron-3-ultra-550b-a55b:free",
-    "thinkingmachines/inkling:free",
 ]
 
 
